@@ -6,6 +6,7 @@
 
 # Ignore shell auto files
 sh_auto_file*
+*.sh
 
 # Ignore Windows batch files
 *.bat

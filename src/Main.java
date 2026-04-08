@@ -10,15 +10,15 @@ import java.util.Set;
 /**
  * Entry point for accessing your project 3 files.
  *
- * @author YOUR NAME HERE
+ * @author Kaylee Henry
  * @version 1.0
- * @userid YOUR USER ID HERE (i.e. gburdell3)
- * @GTID YOUR GT ID HERE (i.e. 900000000)
+ * @userid khenry61
+ * @GTID 904065531
  * <br>
  * <p>
- * Collaborators: LIST ALL COLLABORATORS YOU WORKED WITH HERE
+ * Collaborators: None
  * <p>
- * Resources: LIST ALL NON-COURSE RESOURCES YOU CONSULTED HERE
+ * Resources: None
  * <p>
  * <br>
  * By typing 'I agree' below, you are agreeing that this is your
@@ -27,7 +27,7 @@ import java.util.Set;
  * points.
  *<p>
  *<br>
- * Agree Here: REPLACE THIS TEXT
+ * Agree Here: I agree  
  */
 public class Main {
 
