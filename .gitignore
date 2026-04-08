@@ -1,0 +1,11 @@
+# Ignore PDF files
+*.pdf
+
+# Ignore IntelliJ IDEA module files
+*.iml
+
+# Ignore shell auto files
+sh_auto_file*
+
+# Ignore Windows batch files
+*.bat
