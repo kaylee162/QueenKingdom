@@ -104,7 +104,7 @@ public class QueenKingdom implements StaticWaddleWorks {
 
     @Override
     public boolean addRoad(Intersection a, Intersection b, int duration) {
-        // Basic argument validation
+        // basic argument validation
         if (a == null || b == null) {
             throw new IllegalArgumentException("Intersections cannot be null");
         }
@@ -115,25 +115,32 @@ public class QueenKingdom implements StaticWaddleWorks {
             throw new IllegalArgumentException("Roads cannot be self-loops");
         }
 
-        // Wrap the raw data in Vertex objects so they can be used in the graph.
+        // wrap the raw data in Vertex objects so they can be used in the graph
         Vertex<Intersection> vertexA = new Vertex<>(a);
         Vertex<Intersection> vertexB = new Vertex<>(b);
 
-        // Check for an existing road first
-        // Edge equality ignores weight, so this catches duplicate roads even if the
-        // caller passes a different duration for the same two intersections.
+        // dup roads should return false
         if (roads.containsEdge(new Edge<>(vertexA, vertexB, duration))) {
-            return false; // duplicate road, so do not add it and do not crash
+            return false;
         }
 
-        Intersection rootA = roadNeighborhoods.find(a);
-        Intersection rootB = roadNeighborhoods.find(b);
+        // check if these vertices already exist in the graph so we can determine the return value 
+        // before we modify any state
+        boolean aAlreadyExists = roads.containsVertex(vertexA);
+        boolean bAlreadyExists = roads.containsVertex(vertexB);
 
-        boolean mergedNeighborhoods = !rootA.equals(rootB);
+        boolean mergedNeighborhoods = false;
 
-        // Safe to add now since we already filtered out duplicates above.
+        if (aAlreadyExists && bAlreadyExists) {
+            Intersection rootA = roadNeighborhoods.find(a);
+            Intersection rootB = roadNeighborhoods.find(b);
+            mergedNeighborhoods = !rootA.equals(rootB);
+        }
+
+        // now that the return value has been decided, actually add the road :)
         roads.addEdge(new Edge<>(vertexA, vertexB, duration));
 
+        // keep the disjoint set in sync with the road graph
         roadNeighborhoods.union(a, b);
 
         return mergedNeighborhoods;
@@ -381,47 +388,43 @@ public class QueenKingdom implements StaticWaddleWorks {
         Building best = null;
         double bestAverage = Double.MAX_VALUE;
 
-        // Try each candidate as the source and measure how central it is
-        // by averaging shortest-path distances to all buildings in the grid.
+        // try each candidate as the source and measure how central it is
+        // by avging shortest-path distances to all reachable buildings
         for (Building candidate : candidates) {
             if (candidate == null || !grid.getVertices().contains(new Vertex<>(candidate))) {
                 throw new IllegalArgumentException("Every candidate must exist in the grid");
             }
 
-            // run D's from this candidate to find the shortest distance to every other building in the grid
+            // run D's from this candidate to every building in the grid
             Map<Vertex<Building>, Integer> distances =
                     GraphAlgorithms.dijkstras(new Vertex<>(candidate), grid);
 
             long total = 0;
             int count = 0;
 
-            // sum up the distances to all other reachable buildings in the grid
-            // skip the candidate itself (distance 0) and any unreachable buildings (distance infinity).
+            // Include every reachable building in the average, including the
+            // candidate itself with distance 0. Only skip the unreachable buildings
             for (Vertex<Building> vertex : distances.keySet()) {
                 int distance = distances.get(vertex);
 
-                // Skip self and unreachable buildings
-                if (!vertex.equals(new Vertex<>(candidate))
-                        && distance != Integer.MAX_VALUE) {
-                    total += distance;
+                if (distance != Integer.MAX_VALUE) {
+                    total += distance; // sum up the total distance to all reachable buildings
                     count++;
                 }
             }
 
-            // average distance to all reachable buildings
+            // calc the avg distance to all reachable buildings from this candidate
             double average;
             if (count == 0) {
                 average = Double.MAX_VALUE;
-            } else { // avoid division by zero just in case
+            } else {
                 average = (double) total / count;
             }
 
-            // Smaller average distance means a more central power site
-            // The first valid candidate should always seed "best", even if its average
-            // ends up being Double.MAX_VALUE because no other buildings are reachable
+            // seed the first valid candidate, then keep the smallest avg
             if (best == null || average < bestAverage) {
                 bestAverage = average;
-                best = candidate; // update the best candidate seen so far
+                best = candidate;
             }
         }
 
@@ -432,7 +435,7 @@ public class QueenKingdom implements StaticWaddleWorks {
     public double consolidateGrid() {
         int originalTotalLength = 0;
 
-        // Sum the full current wire cost before trimming anything.
+        // sum the full current wire cost before trimming anything.
         for (Edge<Building> edge : grid.getEdges()) {
             originalTotalLength += edge.weight();
         }
