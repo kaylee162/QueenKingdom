@@ -58,6 +58,6 @@ public class Main {
      */
     public static StaticWaddleWorks getWaddleWorksInstance(MutableGraph<Intersection> roads,
                                                            MutableGraph<Building> grid) {
-        return new apply.Queen(roads, grid);
+        return new apply.QueenKingdom(roads, grid);
     }
 }

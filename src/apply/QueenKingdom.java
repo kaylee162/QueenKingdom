@@ -20,6 +20,8 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 
+import refactor.Princess;
+
 /**
  * @version 1.0
  * @userid khenry61
@@ -56,7 +58,7 @@ import java.util.Set;
  * The road graph leans heavily on a Disjoint Set so neighborhood membership
  * can be updated and queried efficiently after new roads are added.
  */
-public class Queen implements StaticWaddleWorks {
+public class QueenKingdom implements StaticWaddleWorks {
 
     private final MutableGraph<Intersection> roads; // road network between intersections
     private final MutableGraph<Building> grid;      // electrical grid between buildings
@@ -72,31 +74,30 @@ public class Queen implements StaticWaddleWorks {
      * @param roads the initial road graph
      * @param grid the initial electrical grid graph
      */
-    public Queen(MutableGraph<Intersection> roads,
+    public QueenKingdom(MutableGraph<Intersection> roads,
                  MutableGraph<Building> grid) {
         // some basic validation first to avoid ending up in a bad state
         if (roads == null || grid == null) {
             throw new IllegalArgumentException("Graphs cannot be null");
         }
 
-        this.roads = roads; 
-        this.grid = grid;
+        // make defensive copies so outside code cannot mutate WaddleWorks state
+        // after construction and accidentally desync our internal logic.
+        this.roads = new Princess<>(roads.getVertices(), roads.getEdges());
+        this.grid = new Princess<>(grid.getVertices(), grid.getEdges());
         this.roadNeighborhoods = new DisjointSet<>();
 
-        // Every building in the grid must point to a valid closest road intersection.
         validateInitialGridBuildings();
 
-        if (!isConnected(grid)) {
+        if (!isConnected(this.grid)) {
             throw new IllegalArgumentException("Initial grid must be fully connected");
         }
 
-        // First, ensure every road intersection exists as a singleton set.
-        for (Vertex<Intersection> vertex : roads.getVertices()) {
+        for (Vertex<Intersection> vertex : this.roads.getVertices()) {
             roadNeighborhoods.find(vertex.data());
         }
 
-        // Then union endpoints of every existing road so the DS neighborhoods are up-to-date from the start
-        for (Edge<Intersection> edge : roads.getEdges()) {
+        for (Edge<Intersection> edge : this.roads.getEdges()) {
             roadNeighborhoods.union(edge.u().data(), edge.v().data());
         }
     }
@@ -117,23 +118,22 @@ public class Queen implements StaticWaddleWorks {
         // Wrap the raw data in Vertex objects so they can be used in the graph.
         Vertex<Intersection> vertexA = new Vertex<>(a);
         Vertex<Intersection> vertexB = new Vertex<>(b);
-        boolean hadA = roads.getVertices().contains(vertexA);
-        boolean hadB = roads.getVertices().contains(vertexB);
 
-        // New intersections should not count as "preexisting neighborhoods"
-        // for the boolean return value. So we only check for a neighborhood merge
-        // if both endpoints were already present in the road graph.
-        boolean mergedNeighborhoods = false;
-        if (hadA && hadB) {
-            mergedNeighborhoods = !roadNeighborhoods.find(a).equals(roadNeighborhoods.find(b));
+        // Check for an existing road first
+        // Edge equality ignores weight, so this catches duplicate roads even if the
+        // caller passes a different duration for the same two intersections.
+        if (roads.containsEdge(new Edge<>(vertexA, vertexB, duration))) {
+            return false; // duplicate road, so do not add it and do not crash
         }
 
-        // actually add the road edge to the graph.
+        Intersection rootA = roadNeighborhoods.find(a);
+        Intersection rootB = roadNeighborhoods.find(b);
+
+        boolean mergedNeighborhoods = !rootA.equals(rootB);
+
+        // Safe to add now since we already filtered out duplicates above.
         roads.addEdge(new Edge<>(vertexA, vertexB, duration));
 
-        // Make sure both endpoints exist in the disjoint set, then merge them.
-        roadNeighborhoods.find(a);
-        roadNeighborhoods.find(b);
         roadNeighborhoods.union(a, b);
 
         return mergedNeighborhoods;
@@ -187,20 +187,21 @@ public class Queen implements StaticWaddleWorks {
             throw new IllegalArgumentException("Bounds must be non-negative and ordered");
         }
 
-        // this will be the final result map we return, mapping neighborhood roots to their member intersections
         Map<Intersection, Set<Intersection>> grouped = new HashMap<>();
 
-        // Walk through every road intersection and inspect its degree.
+        // include every neighborhood up front, even if its filtered set ends up empty.
+        for (Intersection root : roadNeighborhoods.getRoots()) {
+            grouped.put(root, new HashSet<>());
+        }
+
+        // check every vertex's degree in the roads graph and add it to the 
+        // appropriate neighborhood group if it fits the criteria
         for (Vertex<Intersection> vertex : roads.getVertices()) {
             int degree = roads.getNeighbors(vertex).size();
 
-            // Only include intersections whose connection count is inside [i, j].
             if (degree >= i && degree <= j) {
                 Intersection root = roadNeighborhoods.find(vertex.data());
-
-                // The disjoint-set root is used as the map key so all members of
-                // the same neighborhood end up grouped together.
-                grouped.computeIfAbsent(root, key -> new HashSet<>()).add(vertex.data());
+                grouped.get(root).add(vertex.data());
             }
         }
 
@@ -291,11 +292,12 @@ public class Queen implements StaticWaddleWorks {
         //   fewer avoided/bad intersections first,
         //   then lower total travel time,
         //   then string order as a stable final tiebreaker.
-        PriorityQueue<RouteState> pq = new PriorityQueue<>(
-            Comparator.comparingInt(RouteState::badSeen)
+        Comparator<RouteState> routeOrder = Comparator.comparingInt(RouteState::badSeen)
                 .thenComparingInt(RouteState::totalDuration)
-                .thenComparing(state -> state.vertex().data().toString())
-        );
+                .thenComparing(state -> state.vertex().data().toString());
+
+        PriorityQueue<RouteState> pq = new PriorityQueue<>(routeOrder);
+
         // add a RouteState to the priority queue every time we find a better path to a vertex, 
         // even if that vertex is already in the queue with a worse cost.
         pq.add(new RouteState(start, 0, 0));
@@ -304,9 +306,10 @@ public class Queen implements StaticWaddleWorks {
             RouteState state = pq.remove();
             Vertex<Intersection> current = state.vertex();
 
-            // Skip stale queue entries that are no longer optimal
-            if (state.badSeen() != badCount.get(current)
-                || state.totalDuration() != duration.get(current)) {
+            boolean wrongBadCount = state.badSeen() != badCount.get(current);
+            boolean wrongDuration = state.totalDuration() != duration.get(current);
+
+            if (wrongBadCount || wrongDuration) {
                 continue;
             }
 
@@ -327,15 +330,23 @@ public class Queen implements StaticWaddleWorks {
                     + (avoid.contains(next.data().type()) ? 1 : 0);
                 int nextDuration = state.totalDuration() + neighbor.distance();
 
-                // This path is better if it has fewer bad intersections, or the same number 
-                // of bad intersections but less total duration.
-                boolean betterBad = nextBadCount < badCount.get(next);
-                boolean sameBadBetterTime = nextBadCount == badCount.get(next)
-                    && nextDuration < duration.get(next);
+                int currentBestBad = badCount.get(next);
+                int currentBestDuration = duration.get(next);
 
-                // Update the best-known route only if this path improves the
-                // lexicographic cost pair.
-                if (betterBad || sameBadBetterTime) {
+                boolean betterPath = false;
+
+                // path is better if it has fewer bad intersections, or the same number of bad 
+                // intersections but shorter duration
+                if (nextBadCount < currentBestBad) {
+                    betterPath = true;
+                } else if (nextBadCount == currentBestBad
+                        && nextDuration < currentBestDuration) {
+                    betterPath = true;
+                }
+
+                // if this path to the neighbor is better than any previously known path, update the cost and \
+                // add a new state to the priority queue
+                if (betterPath) {
                     badCount.put(next, nextBadCount);
                     duration.put(next, nextDuration);
                     previous.put(next, current);
@@ -377,22 +388,40 @@ public class Queen implements StaticWaddleWorks {
                 throw new IllegalArgumentException("Every candidate must exist in the grid");
             }
 
-            // this will give us the shortest distance from the candidate to every other building in the grid
+            // run D's from this candidate to find the shortest distance to every other building in the grid
             Map<Vertex<Building>, Integer> distances =
-                GraphAlgorithms.dijkstras(new Vertex<>(candidate), grid);
+                    GraphAlgorithms.dijkstras(new Vertex<>(candidate), grid);
 
             long total = 0;
-            // sum up all the distances so we can calculate the average distance to all other buildings
-            for (Integer distance : distances.values()) {
-                total += distance;
+            int count = 0;
+
+            // sum up the distances to all other reachable buildings in the grid
+            // skip the candidate itself (distance 0) and any unreachable buildings (distance infinity).
+            for (Vertex<Building> vertex : distances.keySet()) {
+                int distance = distances.get(vertex);
+
+                // Skip self and unreachable buildings
+                if (!vertex.equals(new Vertex<>(candidate))
+                        && distance != Integer.MAX_VALUE) {
+                    total += distance;
+                    count++;
+                }
             }
 
-            double average = (double) total / grid.getVertexCount();
+            // average distance to all reachable buildings
+            double average;
+            if (count == 0) {
+                average = Double.MAX_VALUE;
+            } else { // avoid division by zero just in case
+                average = (double) total / count;
+            }
 
-            // Smaller average distance means a more central power site.
-            if (average < bestAverage) {
+            // Smaller average distance means a more central power site
+            // The first valid candidate should always seed "best", even if its average
+            // ends up being Double.MAX_VALUE because no other buildings are reachable
+            if (best == null || average < bestAverage) {
                 bestAverage = average;
-                best = candidate; // update the best candidate (seen so far)
+                best = candidate; // update the best candidate seen so far
             }
         }
 
@@ -427,7 +456,9 @@ public class Queen implements StaticWaddleWorks {
         // Using a temporary list avoids modifying the graph while iterating over it.
         List<Edge<Building>> toRemove = new ArrayList<>();
         for (Edge<Building> edge : grid.getEdges()) {
-            if (!mst.contains(edge)) {
+            boolean keepEdge = mst.contains(edge);
+
+            if (!keepEdge) {
                 toRemove.add(edge);
             }
         }
@@ -534,10 +565,14 @@ public class Queen implements StaticWaddleWorks {
         while (!queue.isEmpty()) {
             Vertex<T> current = queue.remove();
 
+            // now we check all the neighbors of the current vertex and add them to the queue 
+            // if we haven't visited them before
             for (VertexDistance<T> neighbor : graph.getNeighbors(current)) {
-                // visited.add(...) returns true only the first time we see a vertex
-                if (visited.add(neighbor.vertex())) {
-                    queue.add(neighbor.vertex());
+                Vertex<T> next = neighbor.vertex();
+
+                if (!visited.contains(next)) {
+                    visited.add(next);
+                    queue.add(next);
                 }
             }
         }

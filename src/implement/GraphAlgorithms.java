@@ -48,7 +48,7 @@ import java.util.Set;
  *   unweighted graphs when combined with additional bookkeeping
  * - DFS: depth-first traversal of the vertices reachable from the start vertex
  * - Dijkstra (aka D): shortest paths with weights
- * - Prim + Kruskal: build minimum spanning trees
+ * - Prim + Kruskal: build minimum spanning trees (mst)
  *
  * BFS and DFS visit neighbors in adjacency-list order, while D's,
  * Prim's, and Kruskal's use priority-based greedy choices.
@@ -59,8 +59,8 @@ public class GraphAlgorithms {
      * Breadth-First Search (BFS) aka BFFs :)
      *
      * Explores the graph outward in "layers" from the start node.
-     *  * Vertices one edge away from the start are explored before vertices
-     * two edges away, and so on.
+     *    (Vertices that are one edge away from the start are explored before
+     *    vertices two edges away, and so on)
      * The runtime is O(V + E) because each vertex is visited once,
      * and each edge is examined at most once.
      *
@@ -73,24 +73,24 @@ public class GraphAlgorithms {
         validateStartAndGraph(start, graph);
 
         List<Vertex<T>> visitedOrder = new ArrayList<>(); // final traversal order
-        Set<Vertex<T>> visited = new HashSet<>();         // prevents revisiting
-        Queue<Vertex<T>> queue = new ArrayDeque<>();
+        Set<Vertex<T>> visited = new HashSet<>(); // keep track of where we've gone to prevent revisiting
+        Queue<Vertex<T>> queue = new ArrayDeque<>(); // our frontier / TO-DO list
 
-        visited.add(start);   // mark immediately
-        queue.add(start);     // begin traversal YAY
+        visited.add(start); // mark immediately
+        queue.add(start); // begin traversal yay :)
 
         while (!queue.isEmpty()) {
             Vertex<T> current = queue.remove(); // pull from front of queue
-            visitedOrder.add(current);          // record visit in the list
+            visitedOrder.add(current); // record visit in the list
 
             // Explore neighbors in adjacency-list order 
-            // Only enqueue unvisited neighbors to maintain BFS layering and avoid cycles cuz that would be bad
+            // Only enqueue unvisited neighbors to maintain BFS layering and avoid cycles
             for (VertexDistance<T> neighbor : graph.getNeighbors(current)) {
                 Vertex<T> next = neighbor.vertex();
 
                 if (!visited.contains(next)) {
-                    visited.add(next);     // mark BEFORE enqueueing
-                    queue.add(next);       // schedule for future exploration
+                    visited.add(next); // mark BEFORE enqueueing
+                    queue.add(next); // add to the TO-DO list for future exploration
                 }
             }
         }
@@ -99,10 +99,9 @@ public class GraphAlgorithms {
     }
 
     /**
-     * Depth-First Search (DFS).
+     * Depth-First Search (DFS)
      *
-     * Goes as deep as possible before backtracking.
-     * This implementation is recursive.
+     * Goes as deep as possible before backtracking
      * The runtime is O(V + E) because each vertex is visited once,
      * and each edge is examined at most once.
      *
@@ -125,11 +124,11 @@ public class GraphAlgorithms {
     }
 
     /**
-     * Recursive DFS helper.
+     * The recursive DFS helper
      *
      * This is where the actual depth-first behavior happens.
      * Each call visits one vertex, records it, and recursively explores
-     * each unvisited neighbor in adjacency-list order.
+     * each unvisited neighbor in adjacency-list order
      *
      * @param <T> the data type stored in the vertices
      * @param curr the current vertex being explored
@@ -140,10 +139,10 @@ public class GraphAlgorithms {
     private static <T> void dfs(Vertex<T> curr, StaticGraph<T> g,
                                 Set<Vertex<T>> vSet, List<Vertex<T>> list) {
 
-        vSet.add(curr);   // first mark visited
-        list.add(curr);   // and record the visit
+        vSet.add(curr); // first mark visited in the visited list
+        list.add(curr); // and record the visit in the traversal order
 
-        // Keep going deeper until no unvisited neighbors remain
+        // keep going deeper until no unvisited neighbors remain
         for (VertexDistance<T> neighbor : g.getNeighbors(curr)) {
             Vertex<T> next = neighbor.vertex();
 
@@ -161,7 +160,7 @@ public class GraphAlgorithms {
      * Computes the shortest-path distances from the start vertex
      * to every reachable vertex in the graph, leaving unreachable
      * vertices at Integer.MAX_VALUE.
-     * Assumes all edge weights are non-negative.
+     * This assumes that all edge weights are non-negative.
      *
      * @param <T> the data type stored in the vertices
      * @param start the starting vertex
@@ -172,16 +171,16 @@ public class GraphAlgorithms {
                                                         StaticGraph<T> graph) {
         validateStartAndGraph(start, graph);
 
-        // This map will store the best-known distance to each vertex from the start.
+        // this map will store the best-known distance to each vertex from the start
         Map<Vertex<T>, Integer> distances = new HashMap<>();
 
         // Initialize all distances to "infinity" bc we haven't found any paths yet 
         for (Vertex<T> vertex : graph.getVertices()) {
-            distances.put(vertex, Integer.MAX_VALUE); // represents "infinity" (aka unreachable)
+            distances.put(vertex, Integer.MAX_VALUE); // Integer.MAX_VALUE represents "infinity" (aka unreachable)
         }
         distances.put(start, 0); // the start vertex is distance 0 from itself
 
-        // Min-heap ordered by smallest distance bc we always want to explore the closest vertex next
+        // use a min-heap ordered by smallest distance bc we always want to explore the closest vertex next
         PriorityQueue<VertexDistance<T>> pq = new PriorityQueue<>();
         pq.add(new VertexDistance<>(start, 0));
 
@@ -196,7 +195,7 @@ public class GraphAlgorithms {
                 continue;
             }
 
-            // Explore neighbors and update paths if better
+            // Explore neighbors and update paths if there better
             for (VertexDistance<T> neighbor : graph.getNeighbors(current)) {
                 Vertex<T> next = neighbor.vertex();
                 int newDistance = currentDistance + neighbor.distance();
@@ -214,7 +213,7 @@ public class GraphAlgorithms {
     }
 
     /**
-     * Prim's algorithm for constructing a minimum spanning tree
+     * Prim's algorithm for constructing a minimum spanning tree (mst)
      * of a connected graph.
      *
      * Grows an MST by repeatedly choosing the cheapest edge
@@ -255,8 +254,8 @@ public class GraphAlgorithms {
                 continue; // would form a cycle so skip it bc no cycles allowed tisk tisk
             }
 
-            mst.add(edge);   // include edge in MST
-            visited.add(next);
+            mst.add(edge); // include edge in MST
+            visited.add(next); // add the new vertex to the visited set
             addOutgoingEdges(next, graph, visited, pq); // expand frontier with these new edges
         }
 
@@ -269,7 +268,7 @@ public class GraphAlgorithms {
     }
 
     /**
-     * Helper for Prim's algorithm.
+     * The helper for Prim's algorithm
      *
      * Adds all edges leaving a given vertex to the priority queue,
      * but only if they connect to unvisited vertices.
@@ -288,7 +287,7 @@ public class GraphAlgorithms {
         for (VertexDistance<T> neighbor : graph.getNeighbors(vertex)) {
             Vertex<T> next = neighbor.vertex();
 
-            // Skip edges that lead to already visited vertices (bc that would create a cycle and thats bad :( )
+            // Skip the edges that lead to already visited vertices (bc that would create a cycle and thats bad :( )
             if (!visited.contains(next)) {
                 pq.add(new Edge<>(vertex, next, neighbor.distance())); // candidate edge
             }
@@ -296,10 +295,10 @@ public class GraphAlgorithms {
     }
 
     /**
-     * Kruskal's algorithm for a minimum spanning tree.
+     * Kruskal's algorithm for a minimum spanning tree (mst)
      *
      * Processes edges in increasing weight order and greedily adds
-     * an edge when it does not create a cycle.
+     * an edge when it does not create a cycle
      *
      * @param <T> the data type stored in the vertices
      * @param graph the graph on which to build the MST
@@ -315,25 +314,26 @@ public class GraphAlgorithms {
         // belong to the same connected component in the growing forest,
         // so edges that would create cycles can be skipped.
         Set<Edge<T>> mst = new LinkedHashSet<>();
-        PriorityQueue<Edge<T>> pq = new PriorityQueue<>(graph.getEdges());
-        DisjointSet<Vertex<T>> disjointSet = new DisjointSet<>();
+        PriorityQueue<Edge<T>> pq = new PriorityQueue<>(graph.getEdges()); // all edges ordered by weight
+        // this will track the connected components
+        DisjointSet<Vertex<T>> disjointSet = new DisjointSet<>(); 
 
         // Initialize each vertex as its own component
         for (Vertex<T> vertex : graph.getVertices()) {
             disjointSet.find(vertex);
         }
 
-        // Process edges in increasing weight order
+        // process the edges in increasing weight order
         while (!pq.isEmpty() && mst.size() < graph.getVertexCount() - 1) {
             Edge<T> edge = pq.remove();
 
-            Vertex<T> uRoot = disjointSet.find(edge.u());
-            Vertex<T> vRoot = disjointSet.find(edge.v());
+            Vertex<T> uRoot = disjointSet.find(edge.u()); // find the root of u's component
+            Vertex<T> vRoot = disjointSet.find(edge.v()); // find the root of v's component
 
             // Only add edge if it connects two different components
             if (!uRoot.equals(vRoot)) {
                 mst.add(edge);
-                // Merge the components
+                // Merge the components with union
                 disjointSet.union(edge.u(), edge.v()); 
             }
         }
@@ -348,6 +348,8 @@ public class GraphAlgorithms {
 
     /**
      * Shared validation helper.
+     * lowkey not a lot we have to check, but it's still helpful to have a common
+     * validation method to avoid code duplication and ensure consistency across algorithms
      *
      * Validates that the start vertex and graph are non-null and that
      * the start vertex exists in the graph.
