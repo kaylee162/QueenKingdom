@@ -75,7 +75,8 @@ public class Princess<T> extends MutableGraph<T> {
     public Princess(Set<Vertex<T>> vertices, Set<Edge<T>> edges) {
         super(vertices, edges);
 
-        // i used a hash map here bc it has O(1) average-case lookup time for getNeighbors and add/remove edge operations
+        // i used a hash map here bc it has O(1) average-case lookup time for getNeighbors and 
+        // add/remove edge operations
         adjList = new HashMap<>(); 
 
         // validate the vertex first before we start building the adj list

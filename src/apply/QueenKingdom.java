@@ -109,8 +109,8 @@ public class QueenKingdom implements StaticWaddleWorks {
     /**
      * This function adds a new road to the kingdom and returns whether it merged 
      * two separate neighborhoods
-     * This is done in O(1) time by checking the disjoint set parents of the two endpoints 
-     * before we union them
+     * This is done in O(1) time by performing a constant number of graph checks/updates
+     * and disjoint-set operations before synchronizing the road graph and neighborhood structure.
      *
      * @param a the first intersection
      * @param b the second intersection
@@ -164,14 +164,14 @@ public class QueenKingdom implements StaticWaddleWorks {
     /**
      * This function adds a new wire to the grid and validates that the operation 
      * doesn't violate any constraints.
-     * This is done in O(1) time since we can directly check the existence of the buildings 
-     * and their closest intersections in the graph
+     * 
+     * this is done in O(1) time by performing a constant number of validations and
+     * graph updates while preserving the grid's connectivity constraints
      * 
      * @param a the first intersection
      * @param b the second intersection
      * @param length the length of the wire being added
      * @return the set of root intersections
-
      */
     @Override
     public void addWire(Building a, Building b, int length) {
@@ -210,7 +210,8 @@ public class QueenKingdom implements StaticWaddleWorks {
      * This function returns the number of road neighborhoods in the kingdom, which is just the number 
      * of distinct roots in the disjoint set since each root represents a separate connected component of the road graph
      * 
-     * This is an O(1) operation since we can directly access the size of the
+     * this is an O(1) operation since we can directly access the number of current
+     * neighborhood roots tracked by the disjoint set
      * 
      * @return the number of road neighborhoods in the kingdom
      */
@@ -220,11 +221,13 @@ public class QueenKingdom implements StaticWaddleWorks {
     }
 
     /**
-     * This function returns a map of all neighborhoods and their members that have a number of connections within the given bounds
-     * It uses the disjoint set to quickly determine which neighborhood each intersection belongs to, 
-     * and it iterates through all the vertices once to group them 
+     * This function returns a map of all neighborhoods and their members that have a number of connections
+     * within the given bounds. It uses the disjoint set to quickly determine which neighborhood each 
+     * intersection belongs to and it iterates through all the vertices once to group them 
      * 
-     * This whole thing is a O(V + E) since we have to check every vertex and edge at least once to build the neighborhood groups.
+     * This whole thing is O(|R| + |I|) in the worst case, since we may need to inspect
+     * the road graph's adjacency information across all intersections while grouping
+     * qualifying intersections by neighborhood.
      */
     @Override
     public Map<Intersection, Set<Intersection>> getNeighborhoodsByConnections(int i, int j) {
@@ -263,6 +266,9 @@ public class QueenKingdom implements StaticWaddleWorks {
      * which is exactly what we need for this problem. 
      * D's would be overkill since we don't have weighted edges for this particular query.
      * 
+     * this is an O(|R| + |I|) operation in the worst case since we may have to explore
+     * the entire road graph if the target building is unreachable from the source building
+     * 
      * @param from the starting building
      * @param to the destination building
      * @return the minimum number of roads that must be traveled to get from the source building to the target building
@@ -286,7 +292,9 @@ public class QueenKingdom implements StaticWaddleWorks {
         queue.add(start); 
         distanceByRoadCount.put(start, 0); // zero roads taken at the beginning
 
-        // shoudl just call BFS here instead of reinventing it bc this is pretty much the standard BFS template with an added distance map to track how many roads we've taken to reach each vertex. We return as soon as we reach the target vertex, which guarantees it's the shortest path in terms of road count.
+        // this basically a standar BFFs loop where we explore nieghbors level by level. The first time we reach 
+        // the target value, we know for sure that we've found the shortest path in terms of number of roads,
+        // so we can return the distance immediately
         while (!queue.isEmpty()) {
             Vertex<Intersection> current = queue.remove();
 
@@ -294,6 +302,8 @@ public class QueenKingdom implements StaticWaddleWorks {
                 return distanceByRoadCount.get(current);
             }
 
+            // explore neighbors and add them to the queue if we haven't seen them before, 
+            // while also updating their distance from the start    
             for (VertexDistance<Intersection> neighbor : roads.getNeighbors(current)) {
                 Vertex<Intersection> next = neighbor.vertex();
 
@@ -310,7 +320,7 @@ public class QueenKingdom implements StaticWaddleWorks {
     /**
      * This function calculates the shortest route between two buildings, avoiding specified intersection types
      * 
-     * The runtime of this function is O(V log V) 
+     * The runtime of this function is O(|R| log(|R|))
      * 
      * @param from the starting building
      * @param to the destination building
@@ -337,15 +347,11 @@ public class QueenKingdom implements StaticWaddleWorks {
         Map<Vertex<Intersection>, Integer> duration = new HashMap<>();
         Map<Vertex<Intersection>, Vertex<Intersection>> previous = new HashMap<>();
         
-        // and this hashset tracks which vertices have been finalized with optimal routes so we can skip stale queue entries
+        // and this hashset tracks which vertices have been finalized with optimal routes
         Set<Vertex<Intersection>> finalized = new HashSet<>(); 
 
-        // Start by treating every vertex as unreachable / infinitely costly.
-        for (Vertex<Intersection> vertex : roads.getVertices()) {
-            notGood.put(vertex, Integer.MAX_VALUE);
-            duration.put(vertex, Integer.MAX_VALUE);
-        }
-
+        // Start with just the source vertex. Any vertex not yet in these maps is treated as
+        // unreachable / infinitely costly through getOrDefault(...) checks below.
         notGood.put(start, 0);
         duration.put(start, 0);
 
@@ -362,14 +368,16 @@ public class QueenKingdom implements StaticWaddleWorks {
         // add a RouteState to the pq every time we find a better path to a vertex, 
         pq.add(new RouteState(start, 0, 0));
 
-        // should prob implement D's here since we have two cost metrics (bad intersections and duration) 
-        // and we want to find the optimal route based on those. The priority queue will help us always expand the most promising route next, and the notGood and duration maps will help us keep track of the best known cost to reach each vertex so we can skip stale routes in the pq that are no longer optimal.
+        // this is basically D's algorithm but with an extra dimension of "bad intersections seen so far" 
+        // that we prioritize over duration in the routeOrder comparator
         while (!pq.isEmpty()) {
             RouteState state = pq.remove();
             Vertex<Intersection> current = state.vertex();
 
-            boolean wrongBadCount = state.badSeen() != notGood.get(current);
-            boolean wrongDuration = state.totalDuration() != duration.get(current);
+            boolean wrongBadCount = state.badSeen()
+                    != notGood.getOrDefault(current, Integer.MAX_VALUE);
+            boolean wrongDuration = state.totalDuration()
+                    != duration.getOrDefault(current, Integer.MAX_VALUE);
 
             if (wrongBadCount || wrongDuration) {
                 continue;
@@ -392,8 +400,8 @@ public class QueenKingdom implements StaticWaddleWorks {
                     + (avoid.contains(next.data().type()) ? 1 : 0);
                 int nextDuration = state.totalDuration() + neighbor.distance();
 
-                int currentBestBad = notGood.get(next);
-                int currentBestDuration = duration.get(next);
+                int currentBestBad = notGood.getOrDefault(next, Integer.MAX_VALUE);
+                int currentBestDuration = duration.getOrDefault(next, Integer.MAX_VALUE);
 
                 boolean betterPath = false;
 
@@ -418,7 +426,7 @@ public class QueenKingdom implements StaticWaddleWorks {
         }
 
         // if the target is still unreachable after the search, return null cuz no route exitsts
-        if (duration.get(target) == Integer.MAX_VALUE) {
+        if (!duration.containsKey(target)) {
             return null;
         }
 
@@ -438,6 +446,9 @@ public class QueenKingdom implements StaticWaddleWorks {
      * It calculates the average shortest-path distance from each candidate to all reachable buildings.
      * The candidate with the smallest average distance is returned
      * 
+     * the runtime of this function is O(k(|W| log(|W|))), where k is the number of
+     * candidate buildings being considered
+     * 
      * @param candidates the list of candidate buildings to consider
      * @return the building that is the best power site based on average distance to all reachable buildings
      */
@@ -450,9 +461,9 @@ public class QueenKingdom implements StaticWaddleWorks {
         Building best = null;
         double bestAvg = Double.MAX_VALUE;
 
-        // for each candidate, we run D's to find the shortest distance from that candidate to every other building in the grid
-        // then calc the avg of those distnnces (ignoring unreachable buildings) and keep track of the candidate with the 
-        // lowest avg distance
+        // for each candidate, we run D's to find the shortest distance from that candidate to every other 
+        // building in the grid then calc the avg of those distnnces (ignoring unreachable buildings)
+        // and keep track of the candidate with the lowest avg distance
         for (Building candidate : candidates) {
             if (candidate == null || !grid.getVertices().contains(new Vertex<>(candidate))) {
                 throw new IllegalArgumentException("Every candidate must exist in the grid");
@@ -496,9 +507,13 @@ public class QueenKingdom implements StaticWaddleWorks {
 
     /*
      * This function consolidates the electrical grid by removing unnecessary wires while maintaining connectivity
-     * It does this by finding a mst of the grid graph, which represents the subset of wires needed to keep all buildings 
-     * connected with min total wire length
-     * then it removes any wires that aren't part of the mst, which consolidates the grid and eliminates redundant wiring
+     * It does this by finding a mst of the grid graph, which represents the subset of wires needed to keep 
+     * all buildings connected with min total wire length
+     * then it removes any wires that aren't part of the mst, which consolidates the grid and eliminates redundant
+     * wiring
+     * 
+     * this runs in O(|W| log(|W|)) in the worst case since the dominant step is finding
+     * the minimum spanning tree of the grid graph
      * 
      * this is lowgurtgeninely kinda like evict in Dale
      * 
@@ -641,8 +656,9 @@ public class QueenKingdom implements StaticWaddleWorks {
 
         Vertex<T> start = graph.getVertices().iterator().next();
         Set<Vertex<T>> visited = new HashSet<>();
-        // i used a queue here to implement the BFS traversal of the graph. The queue allows us to explore vertices in the 
-        // order they were discovered, which is essential for BFS to ensure we find the shortest path in terms of number of edges.
+        // i used a queue here to implement the BFS traversal of the graph. The queue allows us to 
+        // explore vertices in the order they were discovered 
+        // which is essential for BFS to ensure we find the shortest path in terms of number of edges.
         Queue<Vertex<T>> queue = new ArrayDeque<>();
 
         visited.add(start);
