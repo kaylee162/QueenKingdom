@@ -171,7 +171,6 @@ public class QueenKingdom implements StaticWaddleWorks {
      * @param a the first intersection
      * @param b the second intersection
      * @param length the length of the wire being added
-     * @return the set of root intersections
      */
     @Override
     public void addWire(Building a, Building b, int length) {
@@ -325,7 +324,7 @@ public class QueenKingdom implements StaticWaddleWorks {
      * @param from the starting building
      * @param to the destination building
      * @param avoid the set of intersection types to avoid
-     * @return a list of intersections representing the shortest route, or an empty list if no route exists
+     * @return a list of intersections representing the shortest route, or null if no route exists
      */
     @Override
     public List<Intersection> calculateRoute(Building from, Building to,
