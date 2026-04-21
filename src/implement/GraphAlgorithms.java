@@ -41,26 +41,28 @@ import java.util.Set;
  * ------------------------------------------------
  * 
  * High-level overview:
- * This class implements the core graph algorithms that are used throughout the project.
+ * This class implements the core graph algorithms that are used later in QueenKingdom
  *
- * Our super swag toolkit:
- * - BFS: level-by-level traversal; it can support shortest-path discovery in
- *   unweighted graphs when combined with additional bookkeeping
- * - DFS: depth-first traversal of the vertices reachable from the start vertex
- * - Dijkstra (aka D): shortest paths with weights
- * - Prim + Kruskal: build minimum spanning trees (mst)
- *
- * BFS and DFS visit neighbors in adjacency-list order, while D's,
- * Prim's, and Kruskal's use priority-based greedy choices.
+ * Our super swag toolkit and what they do:
+ * - BFS: used to find the shortest path in an unweighted graph by exploring outward in layers (level by levle)
+ *   which is great for traversal and connectivity checks
+ * - DFS: used to fully explore a graph by going as deep as possible before backtracking, 
+ *   which is great for traversal and connectivity checks
+ * - Dijkstra (aka D): used to find the shortest weighted path from one starting vertex to every 
+ *   other reachable vertex (when edge weights are nonnegative)
+ * - Prim's: used to build a mst by growing one connected tree outward 
+ *   from a starting vertex using the cheapest edges
+ *   Krushkal's: used to build a mst by repeatedly choosing the globally cheapest valid edge
+ *   without creating cycles
  */
 public class GraphAlgorithms {
 
     /**
      * Breadth-First Search (BFS) aka BFFs :)
      *
-     * Explores the graph outward in "layers" from the start node.
-     *    (Vertices that are one edge away from the start are explored before
-     *    vertices two edges away, and so on)
+     * BFS's algorithm explores the graph outward in "layers" from the start node.
+     *    (i.e. vertices that rae one edge away from the start are explored before
+     *    vertices that are two edges away, etc)
      * The runtime is O(V + E) because each vertex is visited once,
      * and each edge is examined at most once.
      *
@@ -72,25 +74,25 @@ public class GraphAlgorithms {
     public static <T> List<Vertex<T>> bfs(Vertex<T> start, StaticGraph<T> graph) {
         validateStartAndGraph(start, graph);
 
-        List<Vertex<T>> visitedOrder = new ArrayList<>(); // final traversal order
-        Set<Vertex<T>> visited = new HashSet<>(); // keep track of where we've gone to prevent revisiting
-        Queue<Vertex<T>> queue = new ArrayDeque<>(); // our frontier / TO-DO list
+        List<Vertex<T>> visitedOrder = new ArrayList<>(); // this will be the final traversal order
+        Set<Vertex<T>> visited = new HashSet<>(); // this will keep track of where we've gone to prevent revisiting
+        Queue<Vertex<T>> queue = new ArrayDeque<>(); // this is our frontier / the TO-DO list
 
-        visited.add(start); // mark immediately
-        queue.add(start); // begin traversal yay :)
+        visited.add(start);
+        queue.add(start); 
 
+        // this is the main loop where BFS can happen 
+        // we keep going until there are no more vertices to explore (i.e. the queue is empty)
         while (!queue.isEmpty()) {
-            Vertex<T> current = queue.remove(); // pull from front of queue
-            visitedOrder.add(current); // record visit in the list
+            Vertex<T> current = queue.remove(); 
+            visitedOrder.add(current); 
 
-            // Explore neighbors in adjacency-list order 
-            // Only enqueue unvisited neighbors to maintain BFS layering and avoid cycles
             for (VertexDistance<T> neighbor : graph.getNeighbors(current)) {
                 Vertex<T> next = neighbor.vertex();
 
                 if (!visited.contains(next)) {
-                    visited.add(next); // mark BEFORE enqueueing
-                    queue.add(next); // add to the TO-DO list for future exploration
+                    visited.add(next); 
+                    queue.add(next); 
                 }
             }
         }
@@ -101,7 +103,7 @@ public class GraphAlgorithms {
     /**
      * Depth-First Search (DFS)
      *
-     * Goes as deep as possible before backtracking
+     * DFS's algorithm goes as deep as possible before backtracking
      * The runtime is O(V + E) because each vertex is visited once,
      * and each edge is examined at most once.
      *
@@ -111,15 +113,16 @@ public class GraphAlgorithms {
      * @return a list of vertices in the order they are visited
      */
     public static <T> List<Vertex<T>> dfs(Vertex<T> start, StaticGraph<T> graph) {
-        // first we gotta validate it
         validateStartAndGraph(start, graph);
 
         List<Vertex<T>> visitedOrder = new ArrayList<>(); // this will store the order we visited nodes in
         
-        // this will track which nodes we've already seen so we don't get stuck in a cycle cuz that would be bad
+        // this will track which nodes we've already seen so we don't get stuck in a cycle (cuz that would be bad)
         Set<Vertex<T>> visited = new HashSet<>();
 
-        dfs(start, graph, visited, visitedOrder); // kick off recursion YAY :)
+        // i used a recursive helper method to keep the main method clean and focused on validation and setup,
+        // but the actual depth-first behavior happens in the helper method below
+        dfs(start, graph, visited, visitedOrder);
         return visitedOrder;
     }
 
@@ -139,15 +142,16 @@ public class GraphAlgorithms {
     private static <T> void dfs(Vertex<T> curr, StaticGraph<T> g,
                                 Set<Vertex<T>> vSet, List<Vertex<T>> list) {
 
-        vSet.add(curr); // first mark visited in the visited list
-        list.add(curr); // and record the visit in the traversal order
+        vSet.add(curr); 
+        list.add(curr);
 
-        // keep going deeper until no unvisited neighbors remain
+        // this is the main DFS loop where we recursively explore neighbors
+        // we go as deep as possible down one path before backtracking to explore other paths
         for (VertexDistance<T> neighbor : g.getNeighbors(curr)) {
             Vertex<T> next = neighbor.vertex();
 
-            // only recurse if we haven't seen this neighbor before to avoid 
-            // cycles and infinite recursion (bc that would be bad)
+            // so we only recurse if we haven't seen this neighbor 
+            //  - to avoid cycles and infinite recursion (bc that would be bad)
             if (!vSet.contains(next)) {
                 dfs(next, g, vSet, list);
             }
@@ -157,10 +161,10 @@ public class GraphAlgorithms {
     /**
      * D's Algorithm
      * 
-     * Computes the shortest-path distances from the start vertex
+     * D's algorithm computes the shortest-path distances from the start vertex
      * to every reachable vertex in the graph, leaving unreachable
      * vertices at Integer.MAX_VALUE.
-     * This assumes that all edge weights are non-negative.
+     * This assumes that all edge weights are non-negative
      *
      * @param <T> the data type stored in the vertices
      * @param start the starting vertex
@@ -176,26 +180,26 @@ public class GraphAlgorithms {
 
         // Initialize all distances to "infinity" bc we haven't found any paths yet 
         for (Vertex<T> vertex : graph.getVertices()) {
-            distances.put(vertex, Integer.MAX_VALUE); // Integer.MAX_VALUE represents "infinity" (aka unreachable)
+            distances.put(vertex, Integer.MAX_VALUE);
         }
-        distances.put(start, 0); // the start vertex is distance 0 from itself
+        distances.put(start, 0);
 
         // use a min-heap ordered by smallest distance bc we always want to explore the closest vertex next
         PriorityQueue<VertexDistance<T>> pq = new PriorityQueue<>();
         pq.add(new VertexDistance<>(start, 0));
 
-        // the strat here: keep exploring the closest vertex until we've exhausted all reachable vertices
+        // the strat here with D's: keep exploring the closest vertex until we've exhausted all reachable vertices
         while (!pq.isEmpty()) {
             VertexDistance<T> currentPair = pq.remove();
             Vertex<T> current = currentPair.vertex();
             int currentDistance = currentPair.distance();
 
-            // Skip outdated entries (for optimization ofc)
+            // skip outdated entries (for optimization ofc)
             if (currentDistance > distances.get(current)) {
                 continue;
             }
 
-            // Explore neighbors and update paths if there better
+            // then explore neighbors and update paths if there better
             for (VertexDistance<T> neighbor : graph.getNeighbors(current)) {
                 Vertex<T> next = neighbor.vertex();
                 int newDistance = currentDistance + neighbor.distance();
@@ -204,7 +208,7 @@ public class GraphAlgorithms {
                 // priority queue for future exploration
                 if (newDistance < distances.get(next)) {
                     distances.put(next, newDistance);
-                    pq.add(new VertexDistance<>(next, newDistance)); // add the updated distance 
+                    pq.add(new VertexDistance<>(next, newDistance));
                 }
             }
         }
@@ -216,7 +220,7 @@ public class GraphAlgorithms {
      * Prim's algorithm for constructing a minimum spanning tree (mst)
      * of a connected graph.
      *
-     * Grows an MST by repeatedly choosing the cheapest edge
+     * This function grows an MST by repeatedly choosing the cheapest edge
      * that connects a visited vertex to an unvisited vertex.
      *
      * @param <T> the data type stored in the vertices
@@ -228,38 +232,42 @@ public class GraphAlgorithms {
     public static <T> Set<Edge<T>> prims(Vertex<T> start, StaticGraph<T> graph) {
         validateStartAndGraph(start, graph);
 
-        Set<Edge<T>> mst = new LinkedHashSet<>(); // this preserves insertion order
+        Set<Edge<T>> mst = new LinkedHashSet<>(); // this will preserve the insertion order
         Set<Vertex<T>> visited = new HashSet<>(); // this tracks which vertices are already in the growing MST
-        // and this will store the candidate edges to add, ordered by weight
+        
+        // and this will store the candidate edges to add (ordered by weight, so well use a pq)
         PriorityQueue<Edge<T>> pq = new PriorityQueue<>(); 
 
         visited.add(start);
         addOutgoingEdges(start, graph, visited, pq); // seed initial edges
 
-        // Continue until all vertices are included OR no edges remain
+        // this is the main loop where Prim's can happen
+        // we will keep adding edges until we've included all vertices in the mst or no edges remain
         while (!pq.isEmpty() && visited.size() < graph.getVertexCount()) {
-            Edge<T> edge = pq.remove(); // smallest edge
+            Edge<T> edge = pq.remove(); 
 
-            // Determine which vertex is the "next" one to visit (the one we haven't seen yet)
+            // Determine which vertex is the "next" one to visit (aka the one we haven't seen yet)
             Vertex<T> next = null;
-            boolean uVisited = visited.contains(edge.u()); // check if u is visited
-            boolean vVisited = visited.contains(edge.v()); // check if v is visited
+            boolean uVisited = visited.contains(edge.u()); 
+            boolean vVisited = visited.contains(edge.v()); 
 
-            // Only accept edges that cross the cut (one in, one out)
+            // if exactly one vertex is visited, then the other vertex is the next one to add
             if (uVisited && !vVisited) {
                 next = edge.v();
-            } else if (!uVisited && vVisited) {
+            } else if (!uVisited && vVisited) { 
+                // if v is visited and u is not, then u is the next vertex to add
                 next = edge.u();
-            } else {
-                continue; // would form a cycle so skip it bc no cycles allowed tisk tisk
+            } else { 
+                // if both vertices are visited, then this edge would create a cycle so skip it 
+                continue; 
             }
 
-            mst.add(edge); // include edge in MST
-            visited.add(next); // add the new vertex to the visited set
-            addOutgoingEdges(next, graph, visited, pq); // expand frontier with these new edges
+            mst.add(edge); 
+            visited.add(next); 
+            addOutgoingEdges(next, graph, visited, pq);
         }
 
-        // If not all vertices were reached then graph must be disconnected
+        // if not all vertices were reached then graph must be disconnected
         if (visited.size() != graph.getVertexCount()) {
             return null;
         }
@@ -270,7 +278,7 @@ public class GraphAlgorithms {
     /**
      * The helper for Prim's algorithm
      *
-     * Adds all edges leaving a given vertex to the priority queue,
+     * This function adds all edges leaving a given vertex to the priority queue,
      * but only if they connect to unvisited vertices.
      *
      * @param <T> the data type stored in the vertices
@@ -283,11 +291,10 @@ public class GraphAlgorithms {
                                              Set<Vertex<T>> visited,
                                              PriorityQueue<Edge<T>> pq) {
 
-        // Only consider edges that lead to unvisited vertices to avoid cycles                            
+        // only consider edges that lead to unvisited vertices to avoid cycles                            
         for (VertexDistance<T> neighbor : graph.getNeighbors(vertex)) {
             Vertex<T> next = neighbor.vertex();
 
-            // Skip the edges that lead to already visited vertices (bc that would create a cycle and thats bad :( )
             if (!visited.contains(next)) {
                 pq.add(new Edge<>(vertex, next, neighbor.distance())); // candidate edge
             }
@@ -297,7 +304,7 @@ public class GraphAlgorithms {
     /**
      * Kruskal's algorithm for a minimum spanning tree (mst)
      *
-     * Processes edges in increasing weight order and greedily adds
+     * Krushkal's algorthim processes edges in increasing weight order and greedily adds
      * an edge when it does not create a cycle
      *
      * @param <T> the data type stored in the vertices
@@ -310,30 +317,29 @@ public class GraphAlgorithms {
             throw new IllegalArgumentException("Graph cannot be null.");
         }
 
-        // Kruskal's algorithm uses a Disjoint Set to track which vertices
-        // belong to the same connected component in the growing forest,
-        // so edges that would create cycles can be skipped.
         Set<Edge<T>> mst = new LinkedHashSet<>();
-        PriorityQueue<Edge<T>> pq = new PriorityQueue<>(graph.getEdges()); // all edges ordered by weight
-        // this will track the connected components
+        PriorityQueue<Edge<T>> pq = new PriorityQueue<>(graph.getEdges()); 
+        
+        // I used a Disjoint Set here to track which vertices belong to the same connected component
+        // so edges that would create cycles can be skipped
         DisjointSet<Vertex<T>> disjointSet = new DisjointSet<>(); 
 
-        // Initialize each vertex as its own component
         for (Vertex<T> vertex : graph.getVertices()) {
             disjointSet.find(vertex);
         }
 
-        // process the edges in increasing weight order
+        // the strat here with Kruskal's: keep adding the cheapest edge that connects two different 
+        // components until we've added enough edges for a spanning tree or we run out of edges
         while (!pq.isEmpty() && mst.size() < graph.getVertexCount() - 1) {
             Edge<T> edge = pq.remove();
 
-            Vertex<T> uRoot = disjointSet.find(edge.u()); // find the root of u's component
-            Vertex<T> vRoot = disjointSet.find(edge.v()); // find the root of v's component
+            Vertex<T> uRoot = disjointSet.find(edge.u()); 
+            Vertex<T> vRoot = disjointSet.find(edge.v()); 
 
-            // Only add edge if it connects two different components
+            // only add the edge if it connects two different components
             if (!uRoot.equals(vRoot)) {
                 mst.add(edge);
-                // Merge the components with union
+                // merge the components with union
                 disjointSet.union(edge.u(), edge.v()); 
             }
         }
@@ -347,7 +353,7 @@ public class GraphAlgorithms {
     }
 
     /**
-     * Shared validation helper.
+     * A shared validation helper.
      * lowkey not a lot we have to check, but it's still helpful to have a common
      * validation method to avoid code duplication and ensure consistency across algorithms
      *
@@ -360,7 +366,7 @@ public class GraphAlgorithms {
      */
     private static <T> void validateStartAndGraph(Vertex<T> start,
                                                   StaticGraph<T> graph) {
-        // Check for null inputs we cant have any of those                                           
+        // Check for null inputs bc we cant have any of those                                           
         if (start == null || graph == null) {
             throw new IllegalArgumentException("Start vertex and graph cannot be null.");
         }
