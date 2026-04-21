@@ -31,26 +31,23 @@ import java.util.Set;
  * ------------------------------------------------
  * 
  * High level overview:
- * This is a class to store a DisjointSet data structure. This data structure has two
- * main functions: find and union. 
- *    - find will look for the root (parent) of a DisjointSet. Calling find on two different T data will 
- *      check if those two are
- *      part of the same set. 
- *    - union will join two sets together if not already 
+ * This is a class to store a DisjointSet. This data structure has two main functions: find and union. 
+ *    - Find will look for the root (parent) of a DisjointSet. Calling find on two different T data will 
+ *      check if those two are part of the same set 
+ *    - Union will join two sets together if they arent already 
  */
 public class DisjointSet<T> {
 
     /**
-     * Maps each data item to its node in the union-find forest.
+     * Maps each data item to its node in the union-find forest
      */
     private final Map<T, DisjointSetNode<T>> disjointSet;
 
     /**
-     * Tracks the current representative/root data values for every disjoint set.
+     * This tracks the current representative/root data values for every disjoint set.
      *
-     * This backing set is what allows getRoots() to run in O(1), since the
-     * method can simply return an unmodifiable view of this already-maintained
-     * set instead of recomputing the roots each time
+     * This backing set is what allows getRoots() to run in O(1), since we can just return an 
+     * unmodifiable view of this set without needing to recompute the roots each time
      */
     private final Set<T> roots;
 
@@ -83,38 +80,37 @@ public class DisjointSet<T> {
 
     /**
      * Recursively finds the root of the DisjointSetNode. 
-     * Performs path compression such that all DisjointSetNodes along the path to the root
-     * will all directly point to the root.
+     * This function performs path compression such that all DisjointSetNodes along the path to the
+     * toot will all directly point to the root.
      *
      * @param curr the current DisjointSetNode to find the root of
      * @return the root of the current node
      */
     private DisjointSetNode<T> find(DisjointSetNode<T> curr) {
         DisjointSetNode<T> parent = curr.getParent();
-        if (parent == curr) { // if the parent is itself, then this is the root, so return it
+        if (parent == curr) {
             return curr;
-        } else { // else, we gotta recurisvely find the root
+        } else {
             parent = find(curr.getParent());
-            // then do path compression by setting the current node's parent to the root we found
+            // do path compression by setting the current node's parent to the root we found
             curr.setParent(parent); 
             return parent;
         }
     }
 
     /**
-     * Attempts to join the two data into the same set by pointing the parent
+     * This function attempts to join the two data into the same set by pointing the parent
      * of one set to the parent of another set.
      *
      * @param first The first data to find the parent of
      * @param second The second data to find the parent of
      */
     public void union(T first, T second) {
-        // first, make sure both elements exist in the structure
         find(first);
         find(second);
 
-        // then actually do the union of the two sets by finding their nodes and calling the private union 
-        // helper function
+        // do the union of the two sets by finding their nodes and calling the private  
+        // union helper function
         union(disjointSet.get(first), disjointSet.get(second));
     }
 
@@ -128,7 +124,6 @@ public class DisjointSet<T> {
      * @param second The second DisjointSetNode to find the parent of
      */
     private void union(DisjointSetNode<T> first, DisjointSetNode<T> second) {
-        // Find the current roots of each node's set.
         DisjointSetNode<T> firstParent = find(first);
         DisjointSetNode<T> secondParent = find(second);
 

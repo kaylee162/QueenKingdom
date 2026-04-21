@@ -31,24 +31,24 @@ import java.util.Set;
  * ------------------------------------------------
  * 
  * High level overview:
- * This is a concrete mutable graph implementation that is backed by an adjacency list.
+ * This is a concrete mutable graph implementation that is backed by an adj list.
  *
  * This graph is:
  *     Simple: meaning it has no self-loops, and at most one edge between a pair of vertices
  *     Weighted: menaing that each edge stores an integer weight
  *     Undirected: meaning that every edge appears in both endpoint neighbor lists
  *
- * The inherited vertices and edges sets come from
- * MutableGraph. And this class adds the adjacency-list representation
+ * The inherited vertices and edges sets come from MutableGraph.
+ * And this class adds the adj list representation
  *
  * @param <T> the data type stored inside each vertex
  */
 public class Princess<T> extends MutableGraph<T> {
 
     /**
-     * Adjacency-list representation of the graph.
+     * This is the adj-list representation of the graph
      *
-     * Each vertex maps to a list of neighboring vertices paired with the
+     * Each vertex maps to a list of nieghboring vertices paired with the
      * weight of the edge connecting them.
      *
      * Every vertex in the graph must appear as a key in this map, even if
@@ -57,21 +57,14 @@ public class Princess<T> extends MutableGraph<T> {
     private final Map<Vertex<T>, List<VertexDistance<T>>> adjList;
 
     /**
-     * Constructs a new mutable graph from the given vertex and edge sets.
-     *
-     * This constructor validates that:
-     *     the sets themselves are not null
-     *     no vertex in the vertex set is null
-     *     no edge in the edge set is null
-     *     every edge endpoint exists in the vertex set
-     *     no self-loop edges exist
+     * This constructs a new mutable graph from the given vertex and edge sets.
      *      
-     * After validation, the constructor builds the adjacency list so that
+     * After validation, the constructor builds the ajd list so that
      * every vertex is present as a key and every undirected edge is inserted
-     * into both endpoint neighbor lists.
+     * into both endpoint neighbor lists
      * 
-     * the runtime of this constructor is O(V + E), since we have to iterate through the sets once
-     * to validate and once to build the adj list
+     * the runtime of this constructor is O(V + E), bc we have to iterate through every vertex to add it 
+     * to the adj list and then we have to iterate through every edge to add it to the adj list as well
      *
      * @param vertices the initial set of vertices
      * @param edges the initial set of edges
@@ -82,10 +75,10 @@ public class Princess<T> extends MutableGraph<T> {
     public Princess(Set<Vertex<T>> vertices, Set<Edge<T>> edges) {
         super(vertices, edges);
 
-        // use a hash map for O(1) vertex lookups when we build the adj list and later when we query it in getNeighbors
+        // i used a hash map here bc it has O(1) average-case lookup time for getNeighbors and add/remove edge operations
         adjList = new HashMap<>(); 
 
-        // first, validate and create empty neighbor lists for every vertex
+        // validate the vertex first before we start building the adj list
         for (Vertex<T> vertex : this.vertices) {
             if (vertex == null) {
                 throw new IllegalArgumentException("Vertex set cannot contain null");
@@ -93,43 +86,38 @@ public class Princess<T> extends MutableGraph<T> {
             adjList.put(vertex, new ArrayList<>()); // put it in the adj list 
         }
 
-        // next, validate every edge and insert it into the undirected adjacency list 
+        // then validate the edges and build the adj list at the same time
         for (Edge<T> edge : this.edges) {
             validateEdgeForConstructor(edge);
 
-            // bc the graph is undirected, each edge must appear twice
-            // once from u to v and once from v to u
+            // bc the graph is undirected, each edge must appear twice (u2v & v2u)
             addNeighbor(edge.u(), edge.v(), edge.weight());
             addNeighbor(edge.v(), edge.u(), edge.weight());
         }
     }
 
     /**
-     * Returns the adjacency list of the graph.
+     * This returns the ajd list of the graph.
      *
-     * This is an O(V + E) operation since we have to make a deep copy of the entire adjacency list to 
-     * prevent external callers from modifying our internal graph representation.
-     *
-     * @return an unmodifiable view of the adjacency list
+     * This is an O(V + E) op since we have to make a deep copy of the entire adj list
+     * @return an unmodifiable view of the adj list
      */
     @Override
     public Map<Vertex<T>, List<VertexDistance<T>>> getAdjList() {
         Map<Vertex<T>, List<VertexDistance<T>>> copy = new HashMap<>();
 
-        // make a deep copy of the adjacency list so that external callers can't modify 
-        // our internal graph representation
+        // make a copy of the adj list so that external callers can't modify it 
         for (Map.Entry<Vertex<T>, List<VertexDistance<T>>> entry : adjList.entrySet()) {
             copy.put(entry.getKey(), new ArrayList<>(entry.getValue()));
         }
 
-        // return an unmodifiable view of the copy so that callers can't modify the copy either, which would be bad
         return copy;
     }
 
     /**
-     * Returns the neighbors of a given vertex 
+     * this returnrs the neighbors of a given vertex 
      *
-     * This is an O(1) lookup in the adjacency map bc we can directly access the 
+     * This is an O(1) lookup in the adj map bc we can directly access the 
      * vertex's neighbor list without iterating through the graph :)
      *
      * @param vertex the vertex whose neighbors should be returned
@@ -138,7 +126,6 @@ public class Princess<T> extends MutableGraph<T> {
      */
     @Override
     public List<VertexDistance<T>> getNeighbors(Vertex<T> vertex) {
-        // cant look up null vertices or vertices that dont exist in the graph
         if (vertex == null || !vertices.contains(vertex)) {
             throw new IllegalArgumentException("Vertex must be non-null and exist in the graph");  
         }
@@ -147,18 +134,16 @@ public class Princess<T> extends MutableGraph<T> {
     }
 
     /**
-     * Adds a vertex to the graph.
+     * this adds a vertex to our graph
      *
      * The new vertex begins with no incident edges, so it receives an empty
-     * neighbor list in the adjacency map.
+     * neighbor list in the adj map.
      *
      * @param vertex the vertex to add
      * @throws IllegalArgumentException if the vertex is null or already exists
      */
     @Override
     public void addVertex(Vertex<T> vertex) {
-        // lowgurtgenuienly it cant be null or already exist in the graph bc that would be bad and 
-        // we dont want bad things in our graph
         if (vertex == null) {
             throw new IllegalArgumentException("Vertex cannot be null");
         }
@@ -166,27 +151,26 @@ public class Princess<T> extends MutableGraph<T> {
             throw new IllegalArgumentException("Vertex already exists in the graph");
         }
 
-        vertices.add(vertex); // add it to the vertex set
-        // and also add it to the adj list with an empty neighbor list since it has no edges yet
+        vertices.add(vertex); 
         adjList.put(vertex, new ArrayList<>()); 
     }
 
     /**
-     * Removes a vertex from the graph.
+     * This rmeoves a vertex from the graph.
      *
-     * Removing a vertex also removes every edge incident to that vertex.
+     * Removing a vertex also removes every edge inicident to that vertex.
      * That means we gotta:
-     *     remove the vertex from the vertex set
-     *     remove all matching edges from the edge set
-     *     remove the vertex from every neighbor list in the adjacency map
-     *     remove the vertex's own adjacency-list entry
+     *     1. remove the vertex from the vertex set
+     *     2. remove all matching edges from the edge set
+     *     3. remove the vertex from every neighbor list in the adj map
+     *     4. remove the vertex's own ajd list entry
+     *     5. remove the vertex from the graph's vertex set
      *
      * @param vertex the vertex to remove
      * @throws IllegalArgumentException if the vertex is null or not in the graph
      */
     @Override
     public void removeVertex(Vertex<T> vertex) {
-        // cant remove null things or things that dont exist
         if (vertex == null) {
             throw new IllegalArgumentException("Vertex cannot be null");
         }
@@ -194,10 +178,10 @@ public class Princess<T> extends MutableGraph<T> {
             throw new IllegalArgumentException("Vertex does not exist in the graph");
         }
 
-        // make a temporary list to avoid modifying the edge set while iterating over it, which would be bad
+        // make a temp list to avoid modifying the edge set while iterating over it, which would be bad
         List<Edge<T>> edgesToRemove = new ArrayList<>();
 
-        // we have to check every edge to see if it's incident to the vertex we want to remove, 
+        // 1. we have to check every edge to see if it's incident to the vertex we want to remove, 
         // which is O(E)
         for (Edge<T> edge : edges) {
             if (edge.u().equals(vertex) || edge.v().equals(vertex)) {
@@ -205,32 +189,32 @@ public class Princess<T> extends MutableGraph<T> {
             }
         }
 
-        // for each edge we found that was incident to the vertex, remove it from the edge set
+        // 2. for each edge we found that was incident to the vertex, remove it from the edge set
         for (Edge<T> edge : edgesToRemove) {
             edges.remove(edge);
         }
 
-        // Remove the vertex from every other vertex's neighbor list.
+        // 3.Remove the vertex from every other vertex's neighbor list.
         for (Vertex<T> other : vertices) {
             if (!other.equals(vertex)) {
-                removeNeighbor(other, vertex); // remove the edge from the other vertex's neighbor list
+                removeNeighbor(other, vertex); 
             }
         }
 
-        // Remove the vertex's own adjacency-list entry.
+        // 4. Remove the vertex's own adj list entry.
         adjList.remove(vertex);
 
-        // Finally remove the vertex from the graph's vertex set.
+        // 5. Finally remove the vertex from the graph's vertex set.
         vertices.remove(vertex);
     }
 
     /**
-     * Adds an undirected edge to the graph.
+     * this adds an undirected edge to the graph
      *
      * If either endpoint vertex does not already exist in the graph,
-     * it is added automatically.     *
+     * it is added automatically.
      * Because the graph is undirected, the edge is stored once in the
-     * edge set but represented twice in the adjacency list.
+     * edge set but represented twice in the adj list (u2v & v2u)
      *
      * @param edge the edge to add
      * @throws IllegalArgumentException if the edge is null, already exists,
@@ -238,15 +222,12 @@ public class Princess<T> extends MutableGraph<T> {
      */
     @Override
     public void addEdge(Edge<T> edge) {
-        validateEdgeForMutation(edge); // validate the edge first
+        validateEdgeForMutation(edge); 
 
-        // then check if it already exists in the graph, bc we dont want duplicates
         if (edges.contains(edge)) {
             throw new IllegalArgumentException("Edge already exists in the graph");
         }
 
-        // Ensure both endpoint vertices exist in the graph.
-        // if they dont, add them using the addVertex
         if (!vertices.contains(edge.u())) {
             addVertex(edge.u());
         }
@@ -254,18 +235,16 @@ public class Princess<T> extends MutableGraph<T> {
             addVertex(edge.v());
         }
 
-        // finally add the edge to the edge set and the adjacency list
         edges.add(edge);
 
-        // And add both directions because this is an undirected graph
         addNeighbor(edge.u(), edge.v(), edge.weight());
         addNeighbor(edge.v(), edge.u(), edge.weight());
     }
 
     /**
-     * Removes an edge from the graph.
+     * this remves an edge from the grahp.
      *
-     * Because the graph is undirected, the edge must be removed from both
+     * bc the graph is undirected, the edge must be removed from both
      * endpoint neighbor lists as well as from the graph's edge set
      *
      * @param edge the edge to remove
@@ -273,7 +252,6 @@ public class Princess<T> extends MutableGraph<T> {
      */
     @Override
     public void removeEdge(Edge<T> edge) {
-        // cant remove null things or things that dont exist 
         if (edge == null) {
             throw new IllegalArgumentException("Edge cannot be null");
         }
@@ -281,24 +259,20 @@ public class Princess<T> extends MutableGraph<T> {
             throw new IllegalArgumentException("Edge does not exist in the graph");
         }
 
-        // remove the edge from the edge set
         edges.remove(edge);
-        // remove both directions from the adjacency list because this is an undirected graph
         removeNeighbor(edge.u(), edge.v());
         removeNeighbor(edge.v(), edge.u());
     }
 
     /**
-     * Validates an edge while the constructor is building the initial graph.
-     * Theres lowkey a lot to check for the edge, so just make a sep function for that
+     * this validates an edge while the constructor is building the initial graph.
+     * lowkgurtgeninely there's a lot to check for the edge, so just make a sep function for that
      *
      * @param edge the edge to validate
      * @throws IllegalArgumentException if the edge is null, has a null endpoint,
      * references a vertex not in the graph, or is a self-loop
      */
     private void validateEdgeForConstructor(Edge<T> edge) {
-        // we have to check for all of these things in the constructor because if any of them were true, 
-        // the graph would be in an invalid state and that would be bad
         if (edge == null) {
             throw new IllegalArgumentException("Edge set cannot contain null");
         }
@@ -315,15 +289,13 @@ public class Princess<T> extends MutableGraph<T> {
 
     /**
      * Validates an edge for add/remove mutation operations.
-     * Again, theres lowkey a lot to check for the edge, so just make a sep function for that too
+     * again, theres lowkey a lot to check for the edge, so just make a sep function for that too
      *
      * @param edge the edge to validate
      * @throws IllegalArgumentException if the edge is null, has a null endpoint,
      * or is a self-loop
      */
     private void validateEdgeForMutation(Edge<T> edge) {
-        // we have to check for all of these things in mutation operations because if any of them were true, 
-        // the graph would be in an invalid state and that would be bad
         if (edge == null) {
             throw new IllegalArgumentException("Edge cannot be null");
         }
@@ -336,7 +308,7 @@ public class Princess<T> extends MutableGraph<T> {
     }
 
     /**
-     * Adds one neighbor entry to the adjacency list.
+     * this adds one neighbor entry to the ajd list.
      *
      * This method only inserts one direction (for undirected behavior,
      * callers must invoke it for both endpoint directions)
@@ -350,7 +322,7 @@ public class Princess<T> extends MutableGraph<T> {
     }
 
     /**
-     * Removes a single neighbor entry from the adjacency list.
+     * this removes a single neighbor entry from the adj list.
      *
      * This removes the to vertex from the from vertex's
      * neighbor list, regardless of the stored edge weight
